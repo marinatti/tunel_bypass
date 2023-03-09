@@ -1,0 +1,68 @@
+import folium
+import pandas as pd
+import pyproj
+import os
+
+
+# Definindo o sistema de coordenadas de destino
+crs_in = pyproj.CRS('epsg:32723')  # UTM
+
+# Definindo o sistema de coordenadas de origem
+crs_out = pyproj.CRS('epsg:4326')  # Geografica
+
+# Criando um transformador de coordenadas
+transformer = pyproj.Transformer.from_crs(crs_in, crs_out, always_xy=True)
+
+# Lendo o arquivo Excel e criando o DataFrame
+df = pd.read_csv(r'C:\Users\marin\PycharmProjects\SCRIPTS\j0_avancos_coord_final.csv', sep=';')
+
+# Converte as coordenadas UTM para geográficas
+df['X'], df['Y'] = transformer.transform(df['X'].values, df['Y'].values)
+
+# Cria o mapa
+mapa = folium.Map(location=[-22.68084, -43.86289],
+                  zoom_start=15,
+                  tiles='https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+                  attr='Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, '
+                       'Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community',
+                  control_scale=True
+                  )
+
+# Adicionando os marcadores a partir do DataFrame
+for i, row in df.iterrows():
+    # Escolhe a cor do icone
+    if row['Classe'] == 'S-V':
+        cor_icone = 'red'
+    elif row['Classe'] == 'S-IV':
+        cor_icone = 'orange'
+    elif row['Classe'] == 'S-III':
+        cor_icone = 'beige'
+    elif row['Classe'] == 'S-II':
+        cor_icone = 'green'
+    elif row['Classe'] == 'S-I':
+        cor_icone = 'blue'
+
+    # Define o conteúdo do popup em formato HTML com uma imagem
+
+    # Especifica o diretório onde as imagens estão
+    dir_path = r'C:\Users\marin\PycharmProjects\SCRIPTS\mapeamentos_png'
+    # Loop pelos arquivos no diretório
+    for filename in os.listdir(dir_path):
+        # Separa o nome do arquivo da extensão
+        name, extension = os.path.splitext(filename)
+        # name, extension = os.path.splitext(filename)
+        if (filename.startswith('J0 CAMBOTA') or filename.startswith('J0 ESTACA')) and name.endswith(str(row['EstacaMap'])):
+            with open(f'C:/Users/marin/PycharmProjects/SCRIPTS/mapeamentos_png/{filename}', 'rb') as imagem:
+                imagem_carregada = imagem.read()
+            imagem_png = f'<img src="C:/Users/marin/PycharmProjects/SCRIPTS/mapeamentos_png/{filename}" alt="">'
+
+    folium.Marker(
+        location=[row['Y'], row['X']],
+        tooltip=row['Frente'] + ' - ' + str(row['EstacaTopo']) + ' - ' + row['Classe'],
+        icon=folium.Icon(color=cor_icone),
+        popup=folium.Popup(folium.Html(imagem_png, script=True), max_height=500, scroll=True)
+    ).add_to(mapa)
+
+# Exibe o mapa no navegador
+mapa.save('mapa.html')
+mapa.show_in_browser()
